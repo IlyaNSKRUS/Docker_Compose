@@ -1,0 +1,73 @@
+version: "3.9"
+
+networks:
+  mynetwork:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.10.0/24
+          gateway: 192.168.10.1
+
+services:
+  my_apps:
+    build: ./app
+    container_name: app
+    command: gunicorn stocks_products.wsgi -b 0.0.0.0:8000 -w 3
+    expose:
+      - 8000
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.10.2
+    env_file:
+      - ./app/.env.dev
+    depends_on:
+      - postgres_db
+    volumes:
+      - static_volume:/src/app/static
+
+  postgres_db:
+    image: postgres:alpine
+    container_name: postgres
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1G
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.10.4
+    env_file:
+        - ./app/.env.dev
+  pg_admin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    environment:
+      - PGADMIN_DEFAULT_PASSWORD=qwerty12
+      - PGADMIN_DEFAULT_EMAIL=admin@yandex.ru
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    ports:
+      - 9991:80
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.10.3
+    depends_on:
+      - postgres_db
+
+  nginx:
+    build: ./nginx
+    container_name: nginx
+    restart: always
+    ports:
+      - 7777:80
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.10.5
+    depends_on:
+      - my_apps
+    volumes:
+      - static_volume:/src/app/static
+
+volumes:
+  static_volume:
+
+
